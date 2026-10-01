@@ -62,6 +62,28 @@ void kal_exec_free(void* p, kal_uintptr size) {
     VirtualFree(p, 0, MEM_RELEASE);
 }
 
+// The partial form (openkal 0.15). This system protects in pages and allocates
+// in a coarser granularity, which is what kal_memory_granularity reports and why
+// a loader asks this instead: an object this system's linker produces aligns its
+// sections to a page, and would be refused against the allocation granularity.
+kal_uintptr kal_exec_granularity(void) {
+    SYSTEM_INFO info{};
+    GetSystemInfo(&info);
+    return info.dwPageSize ? info.dwPageSize : kPage;
+}
+
+int kal_exec_publish_part(void* p, kal_uintptr offset, kal_uintptr size) {
+    const kal_uintptr page = kal_exec_granularity();
+    if (p == nullptr || size == 0 || offset % page != 0 || size % page != 0) return kal_err_invalid;
+    void* part = static_cast<unsigned char*>(p) + offset;
+    DWORD previous = 0;
+    if (!VirtualProtect(part, size, PAGE_EXECUTE_READ, &previous))
+        return okw::translate_win32(GetLastError());
+    if (!FlushInstructionCache(GetCurrentProcess(), part, size))
+        return okw::translate_win32(GetLastError());
+    return kal_ok;
+}
+
 // A published region may be reserved for writing again: this system's
 // protection call is not one-way, and a second `VirtualProtect' to
 // PAGE_READWRITE succeeds. The position is set accordingly, and a caller that

@@ -40,7 +40,17 @@ int kal_task_start(void (*entry)(void*), void* arg, kal_task* out) {
     // The stack is the implementation's, which is what the specification says
     // of it: an environment that does not allocate stacks separately cannot
     // honour a request for one, so there is no parameter for it.
-    void* h = CreateThread(nullptr, 0, run, c, 0, nullptr);
+    //
+    // ITS SIZE IS 8 MiB RESERVED, AS A PROCESS'S FIRST CONTEXT HAS ELSEWHERE.
+    // Given 0, a thread reserves what the program's header says, 1 MiB as
+    // linkers write it. A program above recurses on any context as deeply as on
+    // the first, and one that sizes its own threads cannot say so here: Clang
+    // asks for 8 MiB and instantiates templates accordingly (mcppls ran off the
+    // end of 512 KiB on macOS). Reserved, not committed: what a context never
+    // reaches costs address space, and the system's guard page grows the rest.
+    constexpr unsigned long long kStack = 8ull * 1024 * 1024;
+    constexpr DWORD kReservation = 0x00010000;   // STACK_SIZE_PARAM_IS_A_RESERVATION
+    void* h = CreateThread(nullptr, kStack, run, c, kReservation, nullptr);
     if (!h) {
         const int e = okw::translate_win32(GetLastError());
         kal_free(c, sizeof(context), alignof(context));

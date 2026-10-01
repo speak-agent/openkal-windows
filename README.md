@@ -147,6 +147,16 @@ open long after the starter had gone. The fix is `STARTUPINFOEXW` with a
 standard handles this operation placed; a handle the caller made inheritable for
 some other reason and did not place is no longer inherited.
 
+## Part of a region published (0.11.0)
+
+openkal 0.15's `kal_exec_publish_part` is `VirtualProtect` on the part, with
+`FlushInstructionCache`, and `kal_exec_granularity` is the page (`dwPageSize`,
+4 KiB). It is not `kal_memory_granularity`, which is the coarser of the page and
+the allocation granularity (64 KiB here): an object this system's linker produces
+aligns its sections to a page, and a loader that asked the coarser quantum would
+refuse every one of them. Measured under wine: a region of three pages, the
+middle one published and executed, the outer two still written.
+
 ## Verification
 
 The conformance suite in the specification package, built for this target. The
